@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import httpx
@@ -7,7 +8,11 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
 from .errors import APIError
-from .models import ResultTable
+from .models import ResultTable, VideoDetails
+
+YOUTUBE_DURATION_PATTERN = re.compile(
+    r"^PT(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?(?:(?P<seconds>\d+)S)?$"
+)
 
 
 class GoogleAPIClient:
@@ -60,3 +65,28 @@ class GoogleAPIClient:
                 {item["id"]: item["snippet"]["title"] for item in payload.get("items", [])}
             )
         return titles
+
+    def video_details(self, video_id: str) -> VideoDetails:
+        payload = self._get(
+            f"{self.YOUTUBE_URL}/videos",
+            {"part": "snippet,contentDetails", "id": video_id},
+        )
+        items = payload.get("items", [])
+        if not items:
+            raise APIError(f"video {video_id!r} was not found or is not accessible")
+        item = items[0]
+        return VideoDetails(
+            video_id=item["id"],
+            title=item["snippet"]["title"],
+            duration_seconds=parse_youtube_duration(item["contentDetails"]["duration"]),
+        )
+
+
+def parse_youtube_duration(value: str) -> int:
+    match = YOUTUBE_DURATION_PATTERN.fullmatch(value)
+    if not match:
+        raise APIError(f"unsupported YouTube video duration: {value!r}")
+    hours = int(match.group("hours") or 0)
+    minutes = int(match.group("minutes") or 0)
+    seconds = int(match.group("seconds") or 0)
+    return hours * 3600 + minutes * 60 + seconds

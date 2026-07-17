@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from .api import GoogleAPIClient
-from .models import AudienceRetentionPoint, ChannelSummary, DateRange, VideoPerformance
+from .models import (
+    AudienceRetentionPoint,
+    ChannelSummary,
+    DateRange,
+    VideoDetails,
+    VideoPerformance,
+)
 
 
 class AnalyticsService:
@@ -30,16 +36,51 @@ class AnalyticsService:
         )
 
     def top_videos(self, period: DateRange, *, limit: int = 10) -> list[VideoPerformance]:
+        return self._ranked_videos(period, limit=limit, sort="-views")
+
+    def bottom_videos(self, period: DateRange, *, limit: int = 5) -> list[VideoPerformance]:
+        rows: list[dict] = []
+        start_index = 1
+        page_size = 200
+        while True:
+            table = self.client.analytics_report(
+                ids="channel==MINE",
+                startDate=period.start.isoformat(),
+                endDate=period.end.isoformat(),
+                dimensions="video",
+                metrics=(
+                    "views,estimatedMinutesWatched,averageViewDuration,subscribersGained"
+                ),
+                sort="-views",
+                maxResults=page_size,
+                startIndex=start_index,
+            )
+            rows.extend(table.rows)
+            if len(table.rows) < page_size:
+                break
+            start_index += len(table.rows)
+        return self._video_performance(list(reversed(rows[-limit:])))
+
+    def _ranked_videos(
+        self,
+        period: DateRange,
+        *,
+        limit: int,
+        sort: str,
+    ) -> list[VideoPerformance]:
         table = self.client.analytics_report(
             ids="channel==MINE",
             startDate=period.start.isoformat(),
             endDate=period.end.isoformat(),
             dimensions="video",
             metrics="views,estimatedMinutesWatched,averageViewDuration,subscribersGained",
-            sort="-views",
+            sort=sort,
             maxResults=limit,
         )
-        ids = [str(row["video"]) for row in table.rows]
+        return self._video_performance(list(table.rows))
+
+    def _video_performance(self, rows: list[dict]) -> list[VideoPerformance]:
+        ids = [str(row["video"]) for row in rows]
         titles = self.client.video_titles(ids)
         return [
             VideoPerformance(
@@ -50,7 +91,7 @@ class AnalyticsService:
                 average_view_duration_seconds=row.get("averageViewDuration", 0),
                 subscribers_gained=row.get("subscribersGained", 0),
             )
-            for row in table.rows
+            for row in rows
         ]
 
     def audience_retention(
@@ -76,3 +117,9 @@ class AnalyticsService:
             )
             for row in table.rows
         ]
+
+    def video_details(self, video_id: str) -> VideoDetails:
+        video_id = video_id.strip()
+        if not video_id:
+            raise ValueError("video ID must not be empty")
+        return self.client.video_details(video_id)

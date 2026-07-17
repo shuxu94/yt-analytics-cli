@@ -10,9 +10,11 @@ from rich.console import Console
 
 from .api import GoogleAPIClient
 from .auth import CredentialStore, authorize
+from .dashboard import serve_retention_dashboard
 from .errors import AuthenticationError, YTAnalyticsError
 from .models import DateRange, Profile
 from .output import OutputFormat, render, render_file
+from .performance_dashboard import PerformanceDashboardVideo, serve_performance_dashboard
 from .service import AnalyticsService
 
 load_dotenv()
@@ -21,9 +23,13 @@ app = typer.Typer(no_args_is_help=True, help="YouTube Analytics from your termin
 auth_app = typer.Typer(no_args_is_help=True, help="Manage OAuth profiles.")
 channel_app = typer.Typer(no_args_is_help=True, help="Inspect channel performance.")
 videos_app = typer.Typer(no_args_is_help=True, help="Inspect video performance.")
+video_app = typer.Typer(no_args_is_help=True, help="Open reports for one video.")
+dashboard_app = typer.Typer(no_args_is_help=True, help="Open local analytics dashboards.")
 app.add_typer(auth_app, name="auth")
 app.add_typer(channel_app, name="channel")
 app.add_typer(videos_app, name="videos")
+app.add_typer(video_app, name="video")
+app.add_typer(dashboard_app, name="dashboard")
 
 stdout = Console()
 stderr = Console(stderr=True)
@@ -113,6 +119,90 @@ def videos_retention(
         return
     render_file(result, format, output)
     stderr.print(f"Saved {len(result)} retention points to {output}")
+
+
+@video_app.command("retention")
+def video_retention_dashboard(
+    video_id: Annotated[str, typer.Argument(help="YouTube video ID.")],
+    period: Annotated[str, typer.Option(help="Date window, such as 28d or lifetime.")] = "lifetime",
+    profile: Annotated[str, typer.Option(help="Local profile name.")] = "default",
+    open_browser: Annotated[
+        bool,
+        typer.Option("--open/--no-open", help="Open the dashboard in the default browser."),
+    ] = True,
+    port: Annotated[
+        int,
+        typer.Option(min=0, max=65535, help="Local port; use 0 to select an available port."),
+    ] = 0,
+) -> None:
+    """Open a local video player synchronized with audience retention."""
+    service = _service(profile)
+    video = service.video_details(video_id)
+    retention = service.audience_retention(video_id, DateRange.from_period(period))
+
+    def ready(url: str) -> None:
+        stdout.print(f"Dashboard for [bold]{video.title}[/bold]: {url}")
+        stdout.print("Press Ctrl+C to stop the local dashboard.")
+
+    serve_retention_dashboard(
+        video,
+        retention,
+        port=port,
+        open_browser=open_browser,
+        on_ready=ready,
+    )
+
+
+@dashboard_app.command("videos")
+def videos_performance_dashboard(
+    period: Annotated[str, typer.Option(help="Date window, such as 28d or lifetime.")] = "28d",
+    profile: Annotated[str, typer.Option(help="Local profile name.")] = "default",
+    open_browser: Annotated[
+        bool,
+        typer.Option("--open/--no-open", help="Open the dashboard in the default browser."),
+    ] = True,
+    port: Annotated[
+        int,
+        typer.Option(min=0, max=65535, help="Local port; use 0 to select an available port."),
+    ] = 0,
+) -> None:
+    """Open Top 5 and Bottom 5 videos with synchronized retention."""
+    service = _service(profile)
+    date_range = DateRange.from_period(period)
+    top = service.top_videos(date_range, limit=5)
+    top_ids = {item.video_id for item in top}
+    bottom = [
+        item
+        for item in service.bottom_videos(date_range, limit=10)
+        if item.video_id not in top_ids
+    ][:5]
+    ranked = [
+        ("top", rank, item) for rank, item in enumerate(top, start=1)
+    ] + [
+        ("bottom", rank, item) for rank, item in enumerate(bottom, start=1)
+    ]
+    videos = [
+        PerformanceDashboardVideo(
+            group=group,
+            rank=rank,
+            details=service.video_details(item.video_id),
+            performance=item,
+            retention=service.audience_retention(item.video_id, date_range),
+        )
+        for group, rank, item in ranked
+    ]
+
+    def ready(url: str) -> None:
+        stdout.print(f"Top 5 / Bottom 5 dashboard: {url}")
+        stdout.print("Press Ctrl+C to stop the local dashboard.")
+
+    serve_performance_dashboard(
+        videos,
+        period,
+        port=port,
+        open_browser=open_browser,
+        on_ready=ready,
+    )
 
 
 def main() -> None:

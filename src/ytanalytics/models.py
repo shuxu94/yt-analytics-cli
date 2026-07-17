@@ -48,6 +48,12 @@ class VideoPerformance(BaseModel):
     subscribers_gained: int = 0
 
 
+class VideoDetails(BaseModel):
+    video_id: str
+    title: str
+    duration_seconds: int
+
+
 class AudienceRetentionPoint(BaseModel):
     elapsed_video_time_ratio: float
     audience_watch_ratio: float

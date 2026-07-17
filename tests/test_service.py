@@ -1,6 +1,6 @@
 from datetime import date
 
-from ytanalytics.models import DateRange, ResultTable
+from ytanalytics.models import DateRange, ResultTable, VideoDetails
 from ytanalytics.service import AnalyticsService
 
 
@@ -31,6 +31,9 @@ class FakeClient:
     def video_titles(self, video_ids):
         return {"abc": "Example video"}
 
+    def video_details(self, video_id):
+        return VideoDetails(video_id=video_id, title="Example video", duration_seconds=28)
+
 
 def test_channel_summary_normalizes_google_names() -> None:
     result = AnalyticsService(FakeClient()).channel_summary(
@@ -46,6 +49,18 @@ def test_top_videos_enriches_titles() -> None:
     )
     assert result[0].title == "Example video"
     assert result[0].views == 99
+
+
+def test_bottom_videos_take_the_end_of_descending_results() -> None:
+    client = FakeClient()
+    AnalyticsService(client).bottom_videos(
+        DateRange(start=date(2026, 1, 1), end=date(2026, 1, 28)),
+        limit=5,
+    )
+
+    assert client.last_params["sort"] == "-views"
+    assert client.last_params["maxResults"] == 200
+    assert client.last_params["startIndex"] == 1
 
 
 def test_audience_retention_uses_required_dimension_metric_and_filter() -> None:
@@ -65,3 +80,10 @@ def test_audience_retention_uses_required_dimension_metric_and_filter() -> None:
         "metrics": "audienceWatchRatio",
         "filters": "video==abc",
     }
+
+
+def test_video_details_are_exposed_by_service() -> None:
+    result = AnalyticsService(FakeClient()).video_details("abc")
+
+    assert result.title == "Example video"
+    assert result.duration_seconds == 28

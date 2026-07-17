@@ -40,6 +40,13 @@ yt videos top --period 90d --format csv
 # Download the 100-point audience-retention curve for one video.
 yt videos retention VIDEO_ID --output retention.csv
 yt videos retention VIDEO_ID --period 90d --format json --output retention.json
+
+# Open the real YouTube player synchronized with its retention graph.
+yt video retention VIDEO_ID --open
+yt video retention VIDEO_ID --period 28d --port 8765
+
+# Compare the Top 5 and Bottom 5 by views in one synchronized dashboard.
+yt dashboard videos --period 28d
 ```
 
 Named profiles allow multiple creators or channels:
@@ -61,6 +68,12 @@ written only to stdout; errors are written to stderr, so piping remains reliable
 The retention report uses YouTube's `audienceWatchRatio` metric at each
 `elapsedVideoTimeRatio` point. A watch ratio can exceed `1.0` when viewers rewind and watch a
 segment more than once. YouTube only permits retention queries for one owned video at a time.
+
+The local retention dashboard runs only on `127.0.0.1`. It embeds YouTube's player, follows the
+player's current time, and seeks the video when you click or drag the graph controls. The command
+keeps running while the dashboard is open; press Ctrl+C in the terminal to stop it. Public and
+unlisted videos can play directly. Private videos require the browser to be signed into an account
+that can view them.
 
 ## Design
 
