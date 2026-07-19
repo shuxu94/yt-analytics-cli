@@ -21,9 +21,7 @@ class PerformanceDashboardVideo:
     retention: Sequence[AudienceRetentionPoint]
 
 
-def performance_dashboard_payload(
-    videos: Sequence[PerformanceDashboardVideo], period: str
-) -> dict:
+def performance_dashboard_payload(videos: Sequence[PerformanceDashboardVideo], period: str) -> dict:
     if not videos:
         raise ValueError("the dashboard requires at least one video")
     return {

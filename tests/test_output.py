@@ -16,7 +16,4 @@ def test_render_file_writes_retention_csv(tmp_path) -> None:
         path,
     )
 
-    assert path.read_text() == (
-        "elapsed_video_time_ratio,audience_watch_ratio\n"
-        "0.01,1.1\n"
-    )
+    assert path.read_text() == ("elapsed_video_time_ratio,audience_watch_ratio\n0.01,1.1\n")

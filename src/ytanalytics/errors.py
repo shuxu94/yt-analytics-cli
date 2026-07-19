@@ -8,4 +8,3 @@ class AuthenticationError(YTAnalyticsError):
 
 class APIError(YTAnalyticsError):
     """A Google API request failed."""
-

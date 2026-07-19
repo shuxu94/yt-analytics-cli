@@ -41,9 +41,7 @@ def render(value: BaseModel | list[BaseModel], fmt: OutputFormat, *, console: Co
         _table(rows, console)
 
 
-def render_file(
-    value: BaseModel | list[BaseModel], fmt: OutputFormat, path: Path
-) -> None:
+def render_file(value: BaseModel | list[BaseModel], fmt: OutputFormat, path: Path) -> None:
     """Render a report to a file without terminal styling."""
     if not path.parent.exists():
         raise ValueError(f"output directory does not exist: {path.parent}")

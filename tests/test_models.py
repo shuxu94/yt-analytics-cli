@@ -16,6 +16,14 @@ def test_date_range_rejects_invalid_period() -> None:
         DateRange.from_period("month", today=date(2026, 7, 16))
 
 
+def test_date_range_previous_is_adjacent_and_equal_length() -> None:
+    current = DateRange(start=date(2026, 6, 18), end=date(2026, 7, 15))
+    previous = current.previous()
+    assert previous.start == date(2026, 5, 21)
+    assert previous.end == date(2026, 6, 17)
+    assert previous.days == current.days == 28
+
+
 def test_result_table_maps_headers_to_values() -> None:
     table = ResultTable.from_api(
         {
@@ -24,4 +32,3 @@ def test_result_table_maps_headers_to_values() -> None:
         }
     )
     assert table.rows == ({"video": "abc", "views": 42},)
-
